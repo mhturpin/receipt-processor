@@ -76,7 +76,7 @@ func processReceipt(c *gin.Context) {
     receipts = append(receipts, newReceipt)
 
     // Return Id
-    c.IndentedJSON(200, newReceipt.Id)
+    c.IndentedJSON(200, gin.H{"id": newReceipt.Id})
 }
 
 // Parse and validate info for a receipt
@@ -223,7 +223,7 @@ func getPoints(c *gin.Context) {
     // Find the receipt with the given id, and return the number of points
     for _, r := range receipts {
         if r.Id == id {
-            c.IndentedJSON(200, r.Points)
+            c.IndentedJSON(200, gin.H{"points": r.Points})
             return
         }
     }
