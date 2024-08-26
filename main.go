@@ -43,7 +43,7 @@ type itemJson struct {
     Price               string  `json:"price"`
 }
 
-// initialize receipts slice
+// Initialize receipts slice
 var receipts = []receipt{}
 
 // Routing
@@ -69,7 +69,6 @@ func processReceipt(c *gin.Context) {
     newReceipt, err := parseReceipt(body)
 
     if err != nil {
-        fmt.Println(err)
         c.IndentedJSON(400, gin.H{"message": err.Error()})
         return
     }
@@ -80,6 +79,7 @@ func processReceipt(c *gin.Context) {
     c.IndentedJSON(200, newReceipt.Id)
 }
 
+// Parse and validate info for a receipt
 func parseReceipt(receiptBody receiptJson) (receipt, error) {
     var newReceipt receipt
     var err error
@@ -134,6 +134,7 @@ func parseReceipt(receiptBody receiptJson) (receipt, error) {
     return newReceipt, nil
 }
 
+// Parse and validate info for an item
 func parseItem(itemBody itemJson) (item, error) {
     var newItem item
 
@@ -163,6 +164,7 @@ func parseItem(itemBody itemJson) (item, error) {
     return newItem, nil
 }
 
+// Calculate the number of points awarded for a receipt
 func calculatePoints(r receipt) int {
     totalCents := int(r.Total*100)
 
@@ -188,7 +190,8 @@ func calculatePoints(r receipt) int {
     // If the trimmed length of the item description is a multiple of 3, multiply the price by 0.2 and round up to the nearest integer. The result is the number of points earned
     for _, i := range r.Items {
         if len(strings.TrimSpace(i.ShortDescription)) % 3 == 0 {
-            points += int(math.Round(i.Price*0.2 + 0.5))
+            // Add 0.499 and round to round up to the nearest integer
+            points += int(math.Round(i.Price*0.2 + 0.499))
         }
     }
 
