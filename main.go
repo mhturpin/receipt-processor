@@ -4,6 +4,7 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/google/uuid"
 
+    "errors"
     "fmt"
     "math"
     "regexp"
@@ -65,70 +66,101 @@ func processReceipt(c *gin.Context) {
     }
 
     // Parse requsest and add new receipt to the list
-    newReceipt := parseReceipt(body)
-    receipts = append(receipts, newReceipt)
+    newReceipt, err := parseReceipt(body)
 
-
-    fmt.Println(newReceipt)
-
-
-    // c.IndentedJSON(200, newReceipt.id)
-    c.IndentedJSON(200, newReceipt)
-}
-
-func parseReceipt(receiptBody receiptJson) receipt {
-    var newReceipt receipt
-
-    // Set id
-    newReceipt.Id = uuid.New()
-
-    // Set retailer
-    retailerRe := regexp.MustCompile(`^[\w\s\-&]+$`)
-    newReceipt.Retailer = retailerRe.FindString(receiptBody.Retailer)
-    // handle blank string
-
-    // Set date/time
-    const dateFormat = "2006-01-02 15:04:05"
-    newReceipt.PurchaseDateTime, _ = time.Parse(dateFormat, fmt.Sprintf("%v %v:00", receiptBody.PurchaseDate, receiptBody.PurchaseTime))
-    // handle error
-
-    // Set items
-    for _, i := range receiptBody.Items {
-        newReceipt.Items = append(newReceipt.Items, parseItem(i))
-        // handle error
+    if err != nil {
+        fmt.Println(err)
+        c.IndentedJSON(400, gin.H{"message": err.Error()})
+        return
     }
 
-    // Set total
-    totalRe := regexp.MustCompile(`^\d+\.\d{2}$`)
-    totalString := totalRe.FindString(receiptBody.Total)
-    // handle blank string
-    total, _ := strconv.ParseFloat(totalString, 64)
-    // handle error
-    newReceipt.Total = total
+    receipts = append(receipts, newReceipt)
 
-    // Calculate points
-    newReceipt.Points = calculatePoints(newReceipt)
-
-    return newReceipt
+    // Return Id
+    c.IndentedJSON(200, newReceipt.Id)
 }
 
-func parseItem(itemBody itemJson) item {
+func parseReceipt(receiptBody receiptJson) (receipt, error) {
+    var newReceipt receipt
+    var err error
+
+    // Set Id
+    newReceipt.Id = uuid.New()
+
+    // Set Retailer
+    retailerRe := regexp.MustCompile(`^[\w\s\-&]+$`)
+    newReceipt.Retailer = retailerRe.FindString(receiptBody.Retailer)
+
+    if newReceipt.Retailer == "" {
+        return receipt{}, errors.New("Invalid retailer")
+    }
+
+    // Set PurchaseDateTime
+    const dateFormat = "2006-01-02 15:04:05"
+    newReceipt.PurchaseDateTime, err = time.Parse(dateFormat, fmt.Sprintf("%v %v:00", receiptBody.PurchaseDate, receiptBody.PurchaseTime))
+
+    if err != nil {
+        return receipt{}, errors.New("Invalid purchaseDate or purchaseTime")
+    }
+
+    // Set Items
+    for _, i := range receiptBody.Items {
+        parsedItem, err := parseItem(i)
+
+        if err != nil {
+            return receipt{}, err
+        }
+
+        newReceipt.Items = append(newReceipt.Items, parsedItem)
+    }
+
+    // Set Total
+    totalRe := regexp.MustCompile(`^\d+\.\d{2}$`)
+    totalString := totalRe.FindString(receiptBody.Total)
+
+    if totalString == "" {
+        return receipt{}, errors.New("Invalid total")
+    }
+
+    newReceipt.Total, err = strconv.ParseFloat(totalString, 64)
+
+    if err != nil {
+        return receipt{}, errors.New("Invalid total")
+    }
+
+    // Calculate Points
+    newReceipt.Points = calculatePoints(newReceipt)
+
+    return newReceipt, nil
+}
+
+func parseItem(itemBody itemJson) (item, error) {
     var newItem item
 
-    // Set shortDescription
+    // Set ShortDescription
     descriptionRe := regexp.MustCompile(`^[\w\s\-]+$`)
     newItem.ShortDescription = descriptionRe.FindString(itemBody.ShortDescription)
-    // handle blank string
 
-    // Set price
+    if newItem.ShortDescription == "" {
+        return item{}, errors.New("Invalid shortDescription")
+    }
+
+    // Set Price
     priceRe := regexp.MustCompile(`^\d+\.\d{2}$`)
     priceString := priceRe.FindString(itemBody.Price)
-    // handle blank string
-    price, _ := strconv.ParseFloat(priceString, 64)
-    // handle error
+
+    if priceString == "" {
+        return item{}, errors.New("Invalid price")
+    }
+
+    price, err := strconv.ParseFloat(priceString, 64)
     newItem.Price = price
 
-    return newItem
+    if err != nil {
+        return item{}, errors.New("Invalid price")
+    }
+
+    return newItem, nil
 }
 
 func calculatePoints(r receipt) int {
